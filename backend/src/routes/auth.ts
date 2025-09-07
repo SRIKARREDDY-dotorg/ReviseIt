@@ -40,6 +40,23 @@ router.post('/github/callback', async (req, res) => {
 
     const githubUser = userResponse.data;
 
+    // Try to get user's email if not public
+    let userEmail = githubUser.email;
+    if (!userEmail) {
+      try {
+        const emailResponse = await axios.get('https://api.github.com/user/emails', {
+          headers: {
+            'Authorization': `token ${access_token}`
+          }
+        });
+        const emails = emailResponse.data;
+        const primaryEmail = emails.find((email: any) => email.primary);
+        userEmail = primaryEmail ? primaryEmail.email : null;
+      } catch (emailError) {
+        console.log('Could not fetch user emails:', emailError);
+      }
+    }
+
     // Get user repositories
     const reposResponse = await axios.get('https://api.github.com/user/repos', {
       headers: {
@@ -55,7 +72,7 @@ router.post('/github/callback', async (req, res) => {
     if (user) {
       // Update existing user
       user.username = githubUser.login;
-      user.email = githubUser.email || user.email;
+      user.email = userEmail || user.email;
       user.avatarUrl = githubUser.avatar_url;
       user.accessToken = access_token;
       user.repositories = repositories;
@@ -64,13 +81,13 @@ router.post('/github/callback', async (req, res) => {
       user = new User({
         githubId: githubUser.id.toString(),
         username: githubUser.login,
-        email: githubUser.email,
+        email: userEmail,
         avatarUrl: githubUser.avatar_url,
         accessToken: access_token,
         repositories
       });
     }
-    
+
     await user.save();
 
     // Generate JWT token

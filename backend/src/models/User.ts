@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IUser extends Document {
   githubId: string;
   username: string;
-  email: string;
+  email?: string;
   avatarUrl: string;
   accessToken: string;
   repositories: string[];
@@ -23,7 +23,7 @@ const UserSchema: Schema = new Schema({
   },
   email: {
     type: String,
-    required: true
+    required: false
   },
   avatarUrl: {
     type: String,
