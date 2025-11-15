@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { authAPI } from '../services/api';
@@ -7,9 +7,14 @@ const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { login } = useAuth();
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple executions (React StrictMode runs effects twice)
+    if (hasProcessed.current) return;
+
     const handleCallback = async () => {
+      hasProcessed.current = true;
       const code = searchParams.get('code');
       const error = searchParams.get('error');
 
@@ -36,7 +41,7 @@ const AuthCallback: React.FC = () => {
     };
 
     handleCallback();
-  }, [searchParams, navigate, login]);
+  }, [searchParams, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

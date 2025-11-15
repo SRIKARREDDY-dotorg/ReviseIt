@@ -5,6 +5,9 @@ import { generateToken } from '../middleware/auth';
 
 const router = express.Router();
 
+// Track ongoing OAuth requests to prevent duplicates
+const ongoingRequests = new Set();
+
 // GitHub OAuth callback
 router.post('/github/callback', async (req, res) => {
   try {
@@ -13,6 +16,12 @@ router.post('/github/callback', async (req, res) => {
     if (!code) {
       return res.status(400).json({ message: 'Authorization code required' });
     }
+
+    // Prevent duplicate requests with same code
+    if (ongoingRequests.has(code)) {
+      return res.status(429).json({ message: 'Request already in progress' });
+    }
+    ongoingRequests.add(code);
 
     // Exchange code for access token
     const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
@@ -34,11 +43,12 @@ router.post('/github/callback', async (req, res) => {
     // Get user info from GitHub
     const userResponse = await axios.get('https://api.github.com/user', {
       headers: {
-        'Authorization': `token ${access_token}`
+        'Authorization': `Bearer ${access_token}`
       }
     });
 
     const githubUser = userResponse.data;
+    console.log(githubUser.login);
 
     // Try to get user's email if not public
     let userEmail = githubUser.email;
@@ -46,7 +56,7 @@ router.post('/github/callback', async (req, res) => {
       try {
         const emailResponse = await axios.get('https://api.github.com/user/emails', {
           headers: {
-            'Authorization': `token ${access_token}`
+            'Authorization': `Bearer ${access_token}`
           }
         });
         const emails = emailResponse.data;
@@ -60,7 +70,7 @@ router.post('/github/callback', async (req, res) => {
     // Get user repositories
     const reposResponse = await axios.get('https://api.github.com/user/repos', {
       headers: {
-        'Authorization': `token ${access_token}`
+        'Authorization': `Bearer ${access_token}`
       }
     });
 
@@ -106,6 +116,9 @@ router.post('/github/callback', async (req, res) => {
   } catch (error) {
     console.error('GitHub OAuth error:', error);
     res.status(500).json({ message: 'Authentication failed' });
+  } finally {
+    // Clean up ongoing request tracking
+    ongoingRequests.delete(req.body.code);
   }
 });
 
