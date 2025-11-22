@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
+  // It can cause double execution for the renders, effects, constructors.
   <StrictMode>
     <App />
   </StrictMode>,
