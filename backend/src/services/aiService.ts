@@ -1,3 +1,6 @@
+import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
 export interface AIAnalysisResult {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   topics: string[];
@@ -10,39 +13,113 @@ export interface AIAnalysisResult {
 }
 
 class AIService {
+  private openai: OpenAI | null = null;
+  private gemini: GoogleGenerativeAI | null = null;
+
+  private getOpenAI(): OpenAI | null {
+    if (!process.env.OPENAI_API_KEY) return null;
+    if (!this.openai) {
+      this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    }
+    return this.openai;
+  }
+
+  private getGemini(): GoogleGenerativeAI | null {
+    if (!process.env.GEMINI_API_KEY) return null;
+    if (!this.gemini) {
+      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+    return this.gemini;
+  }
+
   async analyzeProblem(solutionCode: string, leetcodeUrl: string): Promise<AIAnalysisResult> {
     try {
-      // For now, we'll implement a basic pattern recognition system
-      // In a real implementation, you would integrate with OpenAI API or similar
-      
-      const analysis = this.analyzeCodePatterns(solutionCode);
-      const difficulty = this.estimateDifficulty(solutionCode, analysis.patterns);
-      
-      return {
-        difficulty,
-        topics: analysis.topics,
-        patterns: analysis.patterns,
-        timeComplexity: analysis.timeComplexity,
-        spaceComplexity: analysis.spaceComplexity,
-        optimizationSuggestions: analysis.optimizationSuggestions,
-        conceptsUsed: analysis.conceptsUsed,
-        similarProblems: [] // Would be populated by similarity matching
-      };
+      const gemini = this.getGemini();
+      if (gemini) {
+        const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const prompt = `Analyze this LeetCode solution and return ONLY valid JSON:
+
+Code:
+${solutionCode}
+
+URL: ${leetcodeUrl}
+
+Return this exact JSON format:
+{
+  "difficulty": "Easy|Medium|Hard",
+  "topics": ["topic1", "topic2"],
+  "patterns": ["pattern1", "pattern2"],
+  "timeComplexity": "O(n)",
+  "spaceComplexity": "O(1)",
+  "optimizationSuggestions": ["suggestion1", "suggestion2"],
+  "conceptsUsed": ["concept1", "concept2"],
+  "similarProblems": ["problem1", "problem2"]
+}`;
+        
+        const result = await model.generateContent(prompt);
+        const content = result.response.text();
+        const jsonContent = this.extractJSON(content);
+        const analysis = JSON.parse(jsonContent) as AIAnalysisResult;
+        return this.validateAnalysis(analysis);
+      }
+
+      const openai = this.getOpenAI();
+      if (openai) {
+        const response = await openai.chat.completions.create({
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: `Analyze this LeetCode solution and return ONLY valid JSON:\n\nCode:\n${solutionCode}\n\nReturn exact format: {"difficulty":"Easy|Medium|Hard","topics":[],"patterns":[],"timeComplexity":"","spaceComplexity":"","optimizationSuggestions":[],"conceptsUsed":[],"similarProblems":[]}` }],
+          temperature: 0.3,
+          max_tokens: 1000
+        });
+        const content = response.choices[0]?.message?.content;
+        if (content) {
+          const analysis = JSON.parse(content) as AIAnalysisResult;
+          return this.validateAnalysis(analysis);
+        }
+      }
+
+      console.warn('No AI API keys found, using fallback analysis');
+      return this.fallbackAnalysis(solutionCode);
     } catch (error) {
-      console.error('Error analyzing problem:', error);
-      
-      // Return default analysis
-      return {
-        difficulty: 'Medium',
-        topics: ['Unknown'],
-        patterns: ['Unknown'],
-        timeComplexity: 'O(?)',
-        spaceComplexity: 'O(?)',
-        optimizationSuggestions: [],
-        conceptsUsed: [],
-        similarProblems: []
-      };
+      console.error('Error analyzing problem with AI:', error);
+      return this.fallbackAnalysis(solutionCode);
     }
+  }
+
+  private extractJSON(content: string): string {
+    // Remove markdown code blocks
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      return jsonMatch[1].trim();
+    }
+    return content.trim();
+  }
+
+  private validateAnalysis(analysis: any): AIAnalysisResult {
+    return {
+      difficulty: ['Easy', 'Medium', 'Hard'].includes(analysis.difficulty) ? analysis.difficulty : 'Medium',
+      topics: Array.isArray(analysis.topics) ? analysis.topics : ['Unknown'],
+      patterns: Array.isArray(analysis.patterns) ? analysis.patterns : ['Unknown'],
+      timeComplexity: analysis.timeComplexity || 'O(?)',
+      spaceComplexity: analysis.spaceComplexity || 'O(?)',
+      optimizationSuggestions: Array.isArray(analysis.optimizationSuggestions) ? analysis.optimizationSuggestions : [],
+      conceptsUsed: Array.isArray(analysis.conceptsUsed) ? analysis.conceptsUsed : [],
+      similarProblems: Array.isArray(analysis.similarProblems) ? analysis.similarProblems : []
+    };
+  }
+
+  private fallbackAnalysis(code: string): AIAnalysisResult {
+    const analysis = this.analyzeCodePatterns(code);
+    return {
+      difficulty: this.estimateDifficulty(code, analysis.patterns),
+      topics: analysis.topics,
+      patterns: analysis.patterns,
+      timeComplexity: analysis.timeComplexity,
+      spaceComplexity: analysis.spaceComplexity,
+      optimizationSuggestions: analysis.optimizationSuggestions,
+      conceptsUsed: analysis.conceptsUsed,
+      similarProblems: []
+    };
   }
 
   private analyzeCodePatterns(code: string): {
@@ -202,24 +279,57 @@ class AIService {
   }
 
   async findSimilarProblems(problemId: string, patterns: string[], topics: string[]): Promise<string[]> {
-    // This would implement similarity matching logic
-    // For now, return empty array
-    return [];
+    try {
+      const openai = this.getOpenAI();
+      if (!openai) return [];
+
+      const prompt = `Given these algorithm patterns: ${patterns.join(', ')} and topics: ${topics.join(', ')}, suggest 3-5 similar LeetCode problems that use the same concepts. Return only problem names, one per line.`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.5,
+        max_tokens: 200
+      });
+
+      const content = response.choices[0]?.message?.content;
+      return content ? content.split('\n').filter(line => line.trim()) : [];
+    } catch (error) {
+      console.error('Error finding similar problems:', error);
+      return [];
+    }
   }
 
   async generateOptimizationSuggestions(code: string): Promise<string[]> {
-    // This would use AI to generate specific optimization suggestions
-    // For now, return basic suggestions based on patterns
+    try {
+      const openai = this.getOpenAI();
+      if (!openai) return this.basicOptimizationSuggestions(code);
+
+      const prompt = `Analyze this code and provide 2-3 specific optimization suggestions:\n\n${code}\n\nFocus on time/space complexity improvements, algorithmic optimizations, and code efficiency.`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 300
+      });
+
+      const content = response.choices[0]?.message?.content;
+      return content ? content.split('\n').filter(line => line.trim()) : [];
+    } catch (error) {
+      console.error('Error generating optimization suggestions:', error);
+      return this.basicOptimizationSuggestions(code);
+    }
+  }
+
+  private basicOptimizationSuggestions(code: string): string[] {
     const suggestions: string[] = [];
-    
     if (code.includes('nested loop')) {
       suggestions.push('Consider using a hash map to eliminate nested loops');
     }
-    
     if (code.includes('sort') && code.includes('linear search')) {
       suggestions.push('Use binary search after sorting for better performance');
     }
-    
     return suggestions;
   }
 }

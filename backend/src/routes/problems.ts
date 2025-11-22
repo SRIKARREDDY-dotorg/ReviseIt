@@ -165,6 +165,40 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+// Create problem manually
+router.post('/', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { title, leetcodeUrl, solutionCode, difficulty } = req.body;
+
+    if (!title || !leetcodeUrl || !solutionCode || !difficulty) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    // Get AI analysis for the problem
+    const aiAnalysis = await aiService.analyzeProblem(solutionCode, leetcodeUrl);
+    
+    // Create new problem
+    const newProblem = new Problem({
+      userId: req.user!.id,
+      leetcodeUrl,
+      title,
+      solutionCode,
+      difficulty,
+      topics: aiAnalysis.topics || [],
+      patterns: aiAnalysis.patterns || [],
+      githubFilePath: 'manual', // Mark as manually created
+      timeComplexity: aiAnalysis.timeComplexity,
+      spaceComplexity: aiAnalysis.spaceComplexity
+    });
+
+    await newProblem.save();
+    res.status(201).json(newProblem);
+  } catch (error) {
+    console.error('Error creating problem:', error);
+    res.status(500).json({ message: 'Failed to create problem' });
+  }
+});
+
 // Delete problem
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
@@ -181,6 +215,17 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Error deleting problem:', error);
     res.status(500).json({ message: 'Failed to delete problem' });
+  }
+});
+
+// Clear all problems
+router.delete('/', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const result = await Problem.deleteMany({ userId: req.user!.id });
+    res.json({ message: `Deleted ${result.deletedCount} problems` });
+  } catch (error) {
+    console.error('Error clearing problems:', error);
+    res.status(500).json({ message: 'Failed to clear problems' });
   }
 });
 

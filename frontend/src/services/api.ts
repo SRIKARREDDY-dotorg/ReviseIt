@@ -61,6 +61,13 @@ export const problemsAPI = {
 
   getProblem: (id: string) => api.get<Problem>(`/problems/${id}`),
 
+  createProblem: (data: {
+    title: string;
+    leetcodeUrl: string;
+    solutionCode: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+  }) => api.post<Problem>('/problems', data),
+
   syncProblems: (repository: string) =>
     api.post<{ message: string; syncedCount: number; errors?: string[] }>('/problems/sync', {
       repository,

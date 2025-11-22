@@ -80,6 +80,7 @@ ReviseIt/
 - Node.js (v18 or higher)
 - MongoDB (local or cloud)
 - GitHub OAuth App (for authentication)
+- OpenAI API Key OR Gemini API Key (for AI-powered analysis)
 
 ### Installation
 
@@ -113,6 +114,8 @@ ReviseIt/
    FRONTEND_URL=http://localhost:3000
    PORT=5000
    NODE_ENV=development
+   OPENAI_API_KEY=your-openai-api-key-here
+   GEMINI_API_KEY=your-gemini-api-key-here
    ```
 
    Frontend (`.env`):
@@ -142,6 +145,22 @@ ReviseIt/
    - Homepage URL: http://localhost:3000
    - Authorization callback URL: http://localhost:3000/auth/callback
 3. Copy the Client ID and Client Secret to your backend `.env` file
+
+### AI API Setup (Choose One)
+
+**Option 1: Gemini (Free)**
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create a new API key
+3. Add the API key to your backend `.env` file as `GEMINI_API_KEY`
+4. Free tier: 15 requests/minute with gemini-1.5-flash model
+
+**Option 2: OpenAI (Paid)**
+1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Create a new API key
+3. Add the API key to your backend `.env` file as `OPENAI_API_KEY`
+4. Cost: ~$0.002 per analysis
+
+**Note**: System tries Gemini first (if available), then OpenAI, then falls back to pattern matching
 
 ## Usage
 
