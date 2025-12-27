@@ -90,7 +90,7 @@ router.get('/queue', authenticateToken, async (req: AuthRequest, res) => {
 
     // Remove duplicates and sort by priority
     const uniqueProblems = revisionProblems.filter((item, index, self) =>
-      index === self.findIndex(t => t.problem.id === item.problem.id)
+      index === self.findIndex(t => t.problem._id.toString() === item.problem._id.toString())
     );
 
     uniqueProblems.sort((a, b) => b.priority - a.priority);
@@ -117,6 +117,7 @@ router.post('/complete', authenticateToken, async (req: AuthRequest, res) => {
       difficultyRating
     } = req.body;
 
+    console.log(req.body);
     if (!problemId || performanceScore === undefined || timeTaken === undefined || 
         wasCorrect === undefined || difficultyRating === undefined) {
       return res.status(400).json({ message: 'Missing required fields' });
