@@ -34,9 +34,15 @@ const ProblemModal: React.FC<ProblemModalProps> = ({ problem, isOpen, onClose, o
     e.preventDefault();
     if (!problem) return;
 
+    const problemId = problem.id ?? problem._id;
+    if (!problemId) {
+      alert('Unable to update this problem because its ID is missing.');
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await problemsAPI.updateProblem(problem.id, formData);
+      const response = await problemsAPI.updateProblem(problemId, formData);
       onUpdate(response.data);
       onClose();
     } catch (error) {
