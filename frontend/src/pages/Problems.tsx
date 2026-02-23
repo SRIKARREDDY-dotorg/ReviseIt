@@ -6,6 +6,9 @@ import ProblemModal from '../components/ProblemModal';
 import CreateProblemModal from '../components/CreateProblemModal';
 import type { Problem } from '../types';
 
+
+const getProblemId = (problem: Problem): string | null => problem.id ?? problem._id ?? null;
+
 const Problems: React.FC = () => {
   const { user } = useAuth();
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -68,7 +71,7 @@ const Problems: React.FC = () => {
     
     try {
       await problemsAPI.deleteProblem(problemId);
-      setProblems(problems.filter(p => p.id !== problemId));
+      setProblems(problems.filter(p => getProblemId(p) !== problemId));
     } catch (error) {
       console.error('Error deleting problem:', error);
       alert('Failed to delete problem.');
@@ -81,7 +84,10 @@ const Problems: React.FC = () => {
   };
 
   const handleUpdateProblem = (updatedProblem: Problem) => {
-    setProblems(problems.map(p => p.id === updatedProblem.id ? updatedProblem : p));
+    const updatedProblemId = getProblemId(updatedProblem);
+    if (!updatedProblemId) return;
+
+    setProblems(problems.map(p => getProblemId(p) === updatedProblemId ? updatedProblem : p));
   };
 
   const handleCreateProblem = async (problemData: {
@@ -240,8 +246,12 @@ const Problems: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProblems.map((problem) => (
-                  <tr key={problem.id} className="hover:bg-gray-50">
+                {filteredProblems.map((problem) => {
+                  const problemId = getProblemId(problem);
+                  if (!problemId) return null;
+
+                  return (
+                  <tr key={problemId} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
@@ -299,7 +309,7 @@ const Problems: React.FC = () => {
                           <Edit3 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(problem.id)}
+                          onClick={() => handleDelete(problemId)}
                           className="text-red-600 hover:text-red-800"
                           title="Delete problem"
                         >
@@ -308,7 +318,8 @@ const Problems: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

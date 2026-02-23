@@ -7,7 +7,8 @@ export interface User {
 }
 
 export interface Problem {
-  id: string;
+  id?: string;
+  _id?: string;
   userId: string;
   leetcodeUrl: string;
   title: string;

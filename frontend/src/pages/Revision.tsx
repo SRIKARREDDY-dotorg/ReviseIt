@@ -50,8 +50,13 @@ const Revision: React.FC = () => {
 
     try {
       setSubmitting(true);
+      const currentProblemId = currentProblem.problem.id ?? currentProblem.problem._id;
+      if (!currentProblemId) {
+        throw new Error('Unable to complete revision: problem ID is missing.');
+      }
+
       await revisionAPI.completeRevision({
-        problemId: currentProblem.problem._id,
+        problemId: currentProblemId,
         performanceScore,
         timeTaken,
         wasCorrect,
@@ -60,9 +65,10 @@ const Revision: React.FC = () => {
       });
 
       // Remove completed problem from queue
-      setQueue(prev => prev.filter(item => 
-        (item.problem._id) !== (currentProblem.problem._id)
-      ));
+      setQueue(prev => prev.filter(item => {
+        const itemId = item.problem.id ?? item.problem._id;
+        return itemId !== currentProblemId;
+      }));
       setCurrentProblem(null);
       setShowSessionForm(false);
     } catch (error) {
@@ -357,8 +363,11 @@ const Revision: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {queue.map((item) => (
-            <div key={item.problem._id} className="card hover:shadow-md transition-shadow">
+          {queue.map((item) => {
+            const problemId = item.problem.id ?? item.problem._id ?? item.problem.title;
+
+            return (
+            <div key={problemId} className="card hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
@@ -415,7 +424,8 @@ const Revision: React.FC = () => {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
